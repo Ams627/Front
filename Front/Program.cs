@@ -1,6 +1,11 @@
 ﻿using System;
+using System.Diagnostics;
 using System.IO;
+using System.IO.Pipes;
 using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
+
 
 class Program
 {
@@ -76,53 +81,72 @@ class Program
 
     static void Main(string[] args)
     {
-        File.WriteAllText(@"c:\temp\1.txt", "");
-        if (args.Length != 1 || !uint.TryParse(args[0], out uint targetPid))
+        if (args.Length != 1 || !int.TryParse(args[0], out int targetPid))
         {
-            Console.Error.WriteLine("Usage: Front.exe <PID>");
+            Console.Error.WriteLine("Usage: Front.exe <PID>2");
             return;
         }
 
-        EnumWindows((hWnd, lParam) =>
+        if (!TrySendToServer(targetPid))
         {
-            // some programs have more than one top-level window but usually only one is visible:
-            if (!IsWindowVisible(hWnd)) return true;
+            File.AppendAllLines(@"c:\temp\2.txt", [$"first instance: {Process.GetCurrentProcess().Id}"]);
+            // Couldn't reach pipe → we're the first instance
+            StartServerAndRun(targetPid);
+            Thread.Sleep(Timeout.Infinite); // Keep the server alive
+        }
 
-            GetWindowThreadProcessId(hWnd, out uint winPid);
-            if (winPid == targetPid)
-            {
-                IntPtr fgWnd = GetForegroundWindow();
-                uint fgThread = GetWindowThreadProcessId(fgWnd, out _);
-                uint thisThread = GetCurrentThreadId();
-
-                AttachThreadInput(thisThread, fgThread, true);
-
-                if (IsIconic(hWnd))
-                {
-                    ShowWindow(hWnd, 9); // SW_RESTORE
-                    BringWindowToTop(hWnd);
-                    SetWindowPos(hWnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
-                    SetWindowPos(hWnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
-                    ShowWindow(hWnd, 9); // SW_RESTORE
-                    keybd_event(VK_MENU, 0, 0, UIntPtr.Zero);          // key down
-                    keybd_event(VK_MENU, 0, 0x0002, UIntPtr.Zero);
-                }
-
-                bool success = SetForegroundWindow(hWnd);
-
-                AttachThreadInput(thisThread, fgThread, false);
-
-                FlashWindow(hWnd, true);
-
-                if (!success)
-                {
-                    // Console.WriteLine($"Flashing PID {targetPid} hWnd: {hWnd}");
-                    FlashWindow(hWnd, true);
-                }
-
-                return false;
-            }
-            return true;
-        }, IntPtr.Zero);
     }
+
+    private static void HandlePid(int targetPid)
+    {
+        FrontHelper.BringToFrontSmart(targetPid);
+    }
+
+    static void StartServerAndRun(int initialPid)
+    {
+        Task.Run(() => ListenOnPipe());
+        HandlePid(initialPid);
+    }
+
+    static void ListenOnPipe()
+    {
+        var pipeName = "front_pipe";
+        while (true)
+        {
+            using (var server = new NamedPipeServerStream(pipeName, PipeDirection.In))
+            using (var reader = new StreamReader(server))
+            {
+                server.WaitForConnection();
+
+                string pidLine = reader.ReadLine();
+                if (int.TryParse(pidLine, out int pid))
+                {
+                    File.AppendAllLines(@"c:\temp\2.txt", [$"handle pid {pid}"]);
+
+                    HandlePid(pid);
+                }
+            }
+        }
+    }
+
+    static bool TrySendToServer(int pid)
+    {
+        try
+        {
+            using (var client = new NamedPipeClientStream(".", "front_pipe", PipeDirection.Out))
+            {
+                client.Connect(500);
+                using (var writer = new StreamWriter(client) { AutoFlush = true })
+                {
+                    writer.WriteLine(pid);
+                    return true;
+                }
+            }
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
 }

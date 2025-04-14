@@ -1,9 +1,13 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
+    <OutputType>WinExe</OutputType>
     <TargetFramework>net48</TargetFramework>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <DebugType>Embedded</DebugType>
     <LangVersion>Latest</LangVersion>
+    <BinDir>c:\bin</BinDir>
   </PropertyGroup>
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+    <Exec Command="echo copying $(TargetPath) to $(BinDir) &amp;&amp; copy $(TargetPath) $(BinDir)" />
+  </Target>
 </Project>
