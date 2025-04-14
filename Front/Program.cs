@@ -54,6 +54,11 @@ class Program
     const uint SWP_NOSIZE = 0x0001;
     const uint SWP_SHOWWINDOW = 0x0040;
 
+    [DllImport("user32.dll")]
+    static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+
+    const byte VK_MENU = 0x12; // Alt key
+
     static string GetWindowTitle(IntPtr hWnd)
     {
         int length = GetWindowTextLength(hWnd);
@@ -92,6 +97,8 @@ class Program
                     ShowWindow(hWnd, 9); // SW_RESTORE
                     SetWindowPos(hWnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
                     SetWindowPos(hWnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+                    keybd_event(VK_MENU, 0, 0, UIntPtr.Zero);          // key down
+                    keybd_event(VK_MENU, 0, 0x0002, UIntPtr.Zero);
                 }
 
                 bool success = SetForegroundWindow(hWnd);
