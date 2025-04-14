@@ -59,6 +59,11 @@ class Program
 
     const byte VK_MENU = 0x12; // Alt key
 
+
+    [DllImport("user32.dll")]
+    static extern bool BringWindowToTop(IntPtr hWnd);
+
+
     static string GetWindowTitle(IntPtr hWnd)
     {
         int length = GetWindowTextLength(hWnd);
@@ -95,8 +100,10 @@ class Program
                 if (IsIconic(hWnd))
                 {
                     ShowWindow(hWnd, 9); // SW_RESTORE
+                    BringWindowToTop(hWnd);
                     SetWindowPos(hWnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
                     SetWindowPos(hWnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+                    ShowWindow(hWnd, 9); // SW_RESTORE
                     keybd_event(VK_MENU, 0, 0, UIntPtr.Zero);          // key down
                     keybd_event(VK_MENU, 0, 0x0002, UIntPtr.Zero);
                 }
